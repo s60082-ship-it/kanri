@@ -113,6 +113,7 @@ async function addTransaction() {
         setDefaultDate();
         renderTransactions();
         renderStats();
+        renderBudgets();
     };
 }
 
@@ -127,6 +128,7 @@ async function deleteTransaction(id) {
     request.onsuccess = () => {
         renderTransactions();
         renderStats();
+        renderBudgets();
     };
 }
 
@@ -191,7 +193,7 @@ async function setBudget() {
     renderBudgets();
 }
 
-// 予算の表示
+// 予算の表示（全体サマリーを含む）
 async function renderBudgets() {
     const request = db.transaction([storeName], 'readonly')
         .objectStore(storeName)
@@ -205,6 +207,36 @@ async function renderBudgets() {
         );
 
         const categories = ['食事', '交通', 'エンタメ', '医療', 'その他'];
+        
+        // 全体予算と全体使用額を計算
+        let totalBudget = 0;
+        let totalSpent = 0;
+
+        categories.forEach(category => {
+            const budgetKey = `budget_${currentMonth}_${category}`;
+            const budgetAmount = parseInt(localStorage.getItem(budgetKey)) || 0;
+            const spent = currentMonthTransactions
+                .filter(t => t.category === category)
+                .reduce((sum, t) => sum + t.amount, 0);
+
+            totalBudget += budgetAmount;
+            totalSpent += spent;
+        });
+
+        const totalRemaining = totalBudget - totalSpent;
+        const totalPercentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+        const totalStatus = totalPercentage >= 100 ? 'danger' : totalPercentage >= 80 ? 'warning' : '';
+
+        // サマリーの更新
+        document.getElementById('totalBudget').textContent = `¥${totalBudget.toLocaleString()}`;
+        document.getElementById('totalSpent').textContent = `¥${totalSpent.toLocaleString()}`;
+        document.getElementById('totalRemaining').textContent = `¥${totalRemaining.toLocaleString()}`;
+        document.getElementById('totalPercentage').textContent = `${totalPercentage}% 使用済み`;
+
+        const progressFill = document.getElementById('totalProgressFill');
+        progressFill.style.width = `${Math.min(totalPercentage, 100)}%`;
+        progressFill.className = `total-progress-fill ${totalStatus}`;
+
         const budgetList = document.getElementById('budgetList');
 
         let html = '';
